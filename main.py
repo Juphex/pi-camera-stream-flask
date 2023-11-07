@@ -7,7 +7,8 @@ from flask import Flask, render_template, Response, request, send_from_directory
 from camera import VideoCamera
 import os
 
-pi_camera = VideoCamera(flip=False) # flip pi camera if upside down.
+framerate = None
+pi_camera = None
 
 # App Globals (do not edit)
 app = Flask(__name__)
@@ -35,8 +36,16 @@ def video_feed():
 # Take a photo when pressing camera button
 @app.route('/picture')
 def take_picture():
-    pi_camera.take_picture()
-    return "None"
+    from io import BytesIO
+    from PIL import Image
+    #pi_camera.take_picture()
+    frame = pi_camera.get_frame()
+    image = Image.open(io.BytesIO(frame))
+    
+    frame = BytesIO()
+    image.save(frame, 'JPEG', quality=100)
+    frame.seek(0)
+    return send_file(frame, mimetype='image/jpeg')
 
 # Get a single frame
 @app.route('/frame')
@@ -47,6 +56,10 @@ def get_frame():
     from flask import send_file
 
     frame = pi_camera.get_frame()
+    # res = formatFrame(frame)
+    # return Response(res,
+    #                 mimetype='multipart/x-mixed-replace; boundary=frame')
+    # old code:
     image = Image.open(io.BytesIO(frame))
     
     frame = BytesIO()
@@ -55,5 +68,12 @@ def get_frame():
     return send_file(frame, mimetype='image/jpeg')
     
 if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Webcam demo')
+    parser.add_argument('--framerate', required=True, default=2 ,help='Set framerate of the camera')
+    framerate = parser.parse_args().framerate
+    pi_camera = VideoCamera(flip=False, framerate=framerate) # flip pi camera if upside down.
+
 
     app.run(host='0.0.0.0', debug=False, port=5001)
